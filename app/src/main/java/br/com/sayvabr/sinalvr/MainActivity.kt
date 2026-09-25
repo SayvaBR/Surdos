@@ -37,6 +37,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -66,7 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import kotlin.math.min
+import kotlin.math.max
 
 private val Ink = Color(0xFF121820)
 private val Orange = Color(0xFFF36C21)
@@ -151,6 +154,7 @@ private fun ScannerScreen(onOpenLibras: (String) -> Unit) {
                         loading = true
                         status = "Reconhecendo objetos..."
                         VisionEngine.scan(
+                            context = context,
                             bitmap = bitmap,
                             onSuccess = { items ->
                                 frozen = bitmap
@@ -213,7 +217,26 @@ private fun ScannerScreen(onOpenLibras: (String) -> Unit) {
                     ).show()
                 },
                 onLibras = {
-                    selected?.let { onOpenLibras(it.label) }
+                    selected?.let {
+                        if (it.label == "Objeto não identificado") {
+                            Toast.makeText(context, "Corrija o nome antes de abrir a Libras", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onOpenLibras(it.label)
+                        }
+                    }
+                },
+                onRename = { newName ->
+                    val current = selected
+                    if (current != null && newName.isNotBlank()) {
+                        val updated = current.copy(
+                            label = newName.trim().replaceFirstChar { ch -> ch.uppercase() },
+                            confidence = 1f,
+                            needsReview = false
+                        )
+                        val index = detected.indexOfFirst { it.id == current.id }
+                        if (index >= 0) detected[index] = updated
+                        selected = updated
+                    }
                 },
                 onRescan = {
                     frozen = null
@@ -371,6 +394,7 @@ private fun ScanResult(
     onCut: () -> Unit,
     onSave: () -> Unit,
     onLibras: () -> Unit,
+    onRename: (String) -> Unit,
     onRescan: () -> Unit
 ) {
     Column(
@@ -389,7 +413,7 @@ private fun ScanResult(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = "Imagem escaneada",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
+                contentScale = ContentScale.Crop
             )
 
             Canvas(
@@ -397,7 +421,7 @@ private fun ScanResult(
                     .fillMaxSize()
                     .pointerInput(items, selected) {
                         detectTapGestures { tap ->
-                            val scale = min(size.width.toFloat() / bitmap.width, size.height.toFloat() / bitmap.height)
+                            val scale = max(size.width.toFloat() / bitmap.width, size.height.toFloat() / bitmap.height)
                             val drawnW = bitmap.width * scale
                             val drawnH = bitmap.height * scale
                             val dx = (size.width - drawnW) / 2f
@@ -408,7 +432,7 @@ private fun ScanResult(
                         }
                     }
             ) {
-                val scale = min(size.width / bitmap.width.toFloat(), size.height / bitmap.height.toFloat())
+                val scale = max(size.width / bitmap.width.toFloat(), size.height / bitmap.height.toFloat())
                 val drawnW = bitmap.width * scale
                 val drawnH = bitmap.height * scale
                 val dx = (size.width - drawnW) / 2f
@@ -495,6 +519,7 @@ private fun ScanResult(
                 onCut = onCut,
                 onSave = onSave,
                 onLibras = onLibras,
+                onRename = onRename,
                 onRescan = onRescan
             )
         }
@@ -509,8 +534,12 @@ private fun ObjectSheet(
     onCut: () -> Unit,
     onSave: () -> Unit,
     onLibras: () -> Unit,
+    onRename: (String) -> Unit,
     onRescan: () -> Unit
 ) {
+    var showRename by remember(item.id, item.label) { mutableStateOf(false) }
+    var renameText by remember(item.id, item.label) { mutableStateOf(if (item.label == "Objeto não identificado") "" else item.label) }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -534,9 +563,10 @@ private fun ObjectSheet(
             Column(modifier = Modifier.weight(1f)) {
                 Text(item.label, color = Ink, fontSize = 26.sp, fontWeight = FontWeight.Black)
                 Text(
-                    if (item.confidence > 0f) "Objeto reconhecido pela câmera" else "Objeto detectado",
-                    color = Muted,
-                    fontSize = 12.sp
+                    if (item.needsReview) "Reconhecimento incerto • confira o nome" else "Objeto reconhecido pela câmera",
+                    color = if (item.needsReview) Orange else Muted,
+                    fontSize = 12.sp,
+                    fontWeight = if (item.needsReview) FontWeight.Bold else FontWeight.Normal
                 )
                 Text("Português  ↔  Libras", color = Green, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
@@ -546,7 +576,7 @@ private fun ObjectSheet(
 
         Button(
             onClick = onLibras,
-            enabled = !loading,
+            enabled = !loading && item.label != "Objeto não identificado",
             modifier = Modifier.fillMaxWidth().height(54.dp),
             shape = RoundedCornerShape(17.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Orange, contentColor = Color.White)
@@ -555,6 +585,16 @@ private fun ObjectSheet(
         }
 
         Spacer(Modifier.height(8.dp))
+
+        if (item.needsReview || item.label == "Objeto não identificado") {
+            ActionPill(
+                text = "✎  Corrigir nome do objeto",
+                enabled = !loading,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { showRename = true }
+            )
+            Spacer(Modifier.height(8.dp))
+        }
 
         Row {
             ActionPill(
@@ -582,6 +622,46 @@ private fun ObjectSheet(
             color = Muted,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold
+        )
+    }
+
+    if (showRename) {
+        AlertDialog(
+            onDismissRequest = { showRename = false },
+            title = { Text("Qual é este objeto?", fontWeight = FontWeight.Black) },
+            text = {
+                Column {
+                    Text(
+                        "A câmera ficou em dúvida. Digite o nome correto em português para continuar.",
+                        color = Muted,
+                        fontSize = 13.sp
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = renameText,
+                        onValueChange = { renameText = it },
+                        singleLine = true,
+                        label = { Text("Nome do objeto") }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (renameText.isNotBlank()) {
+                            onRename(renameText)
+                            showRename = false
+                        }
+                    }
+                ) {
+                    Text("SALVAR", color = Orange, fontWeight = FontWeight.Black)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRename = false }) {
+                    Text("CANCELAR", color = Muted)
+                }
+            }
         )
     }
 }
@@ -646,7 +726,7 @@ private fun LibrasScreen(word: String, onBack: () -> Unit) {
             shape = RoundedCornerShape(16.dp)
         ) {
             Text(
-                "O avatar abaixo é do VLibras, software público brasileiro. Se o sinal não iniciar sozinho, toque na palavra “$word” dentro do tradutor.",
+                "O VLibras será aberto automaticamente e fará o sinal de “$word”. Toque na palavra abaixo para repetir.",
                 modifier = Modifier.padding(12.dp),
                 color = Ink,
                 fontSize = 12.sp,
@@ -703,56 +783,80 @@ private fun vlibrasHtml(word: String): String {
           <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
           <style>
             html,body{margin:0;padding:0;background:#fff;font-family:system-ui,-apple-system,sans-serif;height:100%;overflow:hidden}
-            #lesson{position:absolute;left:16px;right:16px;top:14px;z-index:4;background:#fff7f0;border:1px solid #ffd2b7;border-radius:18px;padding:14px}
+            #lesson{position:absolute;left:16px;right:16px;top:16px;z-index:2;background:#fff7f0;border:1px solid #ffd2b7;border-radius:18px;padding:14px}
             #lesson small{display:block;color:#66727a;font-weight:700;letter-spacing:.08em;margin-bottom:5px}
             #word{font-size:30px;font-weight:900;color:#121820;cursor:pointer}
             #hint{font-size:12px;color:#66727a;margin-top:6px}
-            [vw]{z-index:99!important}
+            #loading{position:absolute;left:0;right:0;top:46%;text-align:center;color:#66727a;font-size:14px}
           </style>
         </head>
         <body>
           <div id="lesson">
             <small>OBJETO RECONHECIDO</small>
             <div id="word">$safe</div>
-            <div id="hint">Toque na palavra para repetir o sinal.</div>
+            <div id="hint">Toque para repetir o sinal.</div>
           </div>
-
-          <div vw class="enabled">
-            <div vw-access-button class="active"></div>
-            <div vw-plugin-wrapper>
-              <div class="vw-plugin-top-wrapper"></div>
-            </div>
-          </div>
+          <div id="loading">Carregando intérprete em Libras…</div>
 
           <script src="https://vlibras.gov.br/app/vlibras-plugin.js"></script>
           <script>
-            new window.VLibras.Widget({
-              rootPath:'https://vlibras.gov.br/app',
-              avatar:'random',
-              position:'R'
-            });
-
             window.__sinalLensTranslate = function(text){
               var tries = 0;
+
+              try {
+                if (window.VLibrasWidget && typeof window.VLibrasWidget.open === 'function') {
+                  window.VLibrasWidget.open();
+                }
+              } catch(e) {}
+
               var timer = setInterval(function(){
                 tries++;
-                try{
-                  if(window.plugin && window.plugin.player && window.plugin.player.translate){
-                    window.plugin.player.translate(text);
+                try {
+                  if (window.plugin && typeof window.plugin.translate === 'function') {
+                    window.plugin.translate(text);
+                    var loading = document.getElementById('loading');
+                    if (loading) loading.style.display = 'none';
                     clearInterval(timer);
+                    return;
                   }
-                }catch(e){}
-                if(tries > 20) clearInterval(timer);
-              },500);
+                } catch(e) {}
+
+                if (tries >= 40) {
+                  var loading = document.getElementById('loading');
+                  if (loading) loading.innerText = 'Não foi possível carregar o VLibras. Verifique a internet e tente novamente.';
+                  clearInterval(timer);
+                }
+              }, 350);
             };
 
-            document.getElementById('word').onclick=function(){
+            function startVLibras(){
+              try {
+                new window.VLibras.Widget({
+                  rootPath: 'https://vlibras.gov.br/app',
+                  avatar: 'icaro',
+                  position: 'R',
+                  showButton: false
+                });
+
+                if (window.VLibrasWidget && typeof window.VLibrasWidget.open === 'function') {
+                  window.VLibrasWidget.open();
+                }
+              } catch(e) {}
+
+              setTimeout(function(){
+                window.__sinalLensTranslate(document.getElementById('word').innerText);
+              }, 700);
+            }
+
+            document.getElementById('word').onclick = function(){
               window.__sinalLensTranslate(this.innerText);
             };
 
-            setTimeout(function(){
-              window.__sinalLensTranslate(document.getElementById('word').innerText);
-            },1200);
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', function(){ setTimeout(startVLibras, 300); });
+            } else {
+              setTimeout(startVLibras, 300);
+            }
           </script>
         </body>
         </html>
