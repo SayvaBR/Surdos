@@ -693,7 +693,7 @@ private fun vlibrasHtml(word: String): String {
         .replace("&", "&amp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
-        .replace(""", "&quot;")
+        .replace(34.toChar().toString(), "&quot;")
 
     return """
         <!doctype html>
@@ -760,10 +760,11 @@ private fun vlibrasHtml(word: String): String {
 }
 
 private fun jsString(value: String): String {
-    return """ + value
+    val quote = 34.toChar().toString()
+    return quote + value
         .replace("\\", "\\\\")
-        .replace(""", "\\"")
-        .replace("\n", "\\n") + """
+        .replace(quote, "\\"")
+        .replace("\n", "\\n") + quote
 }
 
 @Composable
