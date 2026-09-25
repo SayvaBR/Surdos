@@ -680,7 +680,7 @@ private fun LibrasScreen(word: String, onBack: () -> Unit) {
             },
             update = { webView ->
                 webView.evaluateJavascript(
-                    "if(window.__sinalLensTranslate){window.__sinalLensTranslate(" + jsString(word) + ");}",
+                    "if(window.__sinalLensTranslate){window.__sinalLensTranslate(" + org.json.JSONObject.quote(word) + ");}",
                     null
                 )
             }
@@ -757,14 +757,6 @@ private fun vlibrasHtml(word: String): String {
         </body>
         </html>
     """.trimIndent()
-}
-
-private fun jsString(value: String): String {
-    val quote = 34.toChar().toString()
-    return quote + value
-        .replace("\\", "\\\\")
-        .replace(quote, "\\"")
-        .replace("\n", "\\n") + quote
 }
 
 @Composable
