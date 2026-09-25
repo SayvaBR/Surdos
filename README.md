@@ -1,20 +1,39 @@
-# SinalVR — Material Didático Imersivo em Libras
+# SinalLens AR
 
-Protótipo Android de uma experiência de realidade virtual acessível para estudantes surdos.
+Protótipo Android de material didático bilíngue em **realidade aumentada pela câmera** para estudantes surdos.
 
 ## Para quem?
-Estudantes surdos da Educação Básica, professores e colegas ouvintes em atividades bilíngues.
+Estudantes surdos, com foco em alfabetização bilíngue e associação entre Libras, objetos reais e português escrito.
 
 ## O que é?
-Um ambiente virtual explorável no celular (com modo comum e modo VR/Cardboard) em que o estudante entra em cenários do cotidiano escolar e toca/olha para pontos de interesse. Cada ponto apresenta informação visual, texto em português e espaço previsto para vídeo em Libras.
+Um aplicativo Android inspirado na lógica do Google Lens. A pessoa aponta a câmera para o ambiente, escaneia objetos do cotidiano, toca em um objeto reconhecido e acessa:
+- nome em português;
+- recorte automático do objeto;
+- opção de salvar PNG sem fundo;
+- visualização do sinal em Libras com avatar do VLibras.
 
 ## Por quê?
-Conteúdos escolares e avisos do cotidiano muitas vezes dependem de explicações orais. O SinalVR prioriza uma experiência visual-espacial e permite repetir, explorar e aprender no próprio ritmo.
+O projeto aproxima o vocabulário de situações reais e concretas. Em vez de começar por uma lista abstrata de palavras, o estudante explora o próprio ambiente: cadeira, mesa, livro, mochila, planta etc.
 
-## Como?
-Aplicativo Android. O celular usa seus sensores de movimento para criar efeito de imersão. Pode ser usado na mão ou encaixado em um visor simples tipo Google Cardboard. O protótipo demonstra um cenário de sala de aula com pontos interativos, feedback visual e vibração.
+## Como funciona?
+1. CameraX exibe a câmera;
+2. ML Kit detecta objetos;
+3. Image Labeling identifica o objeto;
+4. Subject Segmentation remove o fundo;
+5. a interface desenha marcações sobre a imagem, criando a camada de realidade aumentada;
+6. o objeto selecionado é enviado como palavra para o VLibras, que sinaliza usando avatar 3D.
 
-> Importante: o protótipo não tenta substituir intérpretes nem gerar Libras automaticamente. Conteúdos em Libras devem ser gravados/validados por pessoas fluentes e pela comunidade surda.
+## Custo
+Não há API paga nem token comercial no MVP. A stack usa bibliotecas Android/Google gratuitas e o VLibras, software público brasileiro.
 
-## Base conceitual
-Pesquisas recentes em VR e língua de sinais destacam ambientes imersivos, gamificação, pistas visuais e feedback como caminhos promissores, com necessidade de validação linguística e co-design com pessoas surdas.
+## Observação
+A tradução automática em Libras não substitui validação linguística por pessoas surdas/profissionais de Libras. Para uso pedagógico final, o vocabulário e os sinais apresentados devem ser revisados com a comunidade surda.
+
+## Stack
+- Android / Kotlin
+- Jetpack Compose
+- CameraX
+- Google ML Kit Object Detection
+- Google ML Kit Image Labeling
+- Google ML Kit Subject Segmentation
+- VLibras
