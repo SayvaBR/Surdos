@@ -556,7 +556,7 @@ private fun rememberHeadPose(): HeadPose {
         }
 
         if (rotation != null) {
-            sensorManager.registerListener(listener, rotation, SensorManager.SENSOR_DELAY_GAME)
+            sensorManager?.registerListener(listener, rotation, SensorManager.SENSOR_DELAY_GAME)
         }
 
         onDispose {
