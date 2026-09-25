@@ -27,6 +27,12 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Download EfficientNet Lite model
+        run: |
+          mkdir -p app/src/main/assets
+          curl --fail --location --retry 3 -o app/src/main/assets/efficientnet_lite0.tflite https://storage.googleapis.com/mediapipe-models/image_classifier/efficientnet_lite0/float32/1/efficientnet_lite0.tflite
+          test -s app/src/main/assets/efficientnet_lite0.tflite
+
       - name: Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
